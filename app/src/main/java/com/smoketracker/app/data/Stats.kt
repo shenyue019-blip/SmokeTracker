@@ -60,21 +60,34 @@ object StatsCalculator {
         }
     }
 
+    /**
+     * 取一次抽烟事件的实际计费数值。
+     * 优先用「烟品当前数值」——这样用户后补价格/焦油/尼古丁后，过去的记录会自动算上。
+     * 只有当烟品已被删除（map 里查不到）时，才退回事件保存的快照。
+     */
+    private fun effective(e: SmokeEvent, cigs: Map<Long, Cigarette>): Triple<Double, Double, Double> {
+        val c = cigs[e.cigaretteId]
+        return if (c != null) Triple(c.pricePerCig, c.tarMg, c.nicotineMg)
+        else Triple(e.cost, e.tarMg, e.nicotineMg)
+    }
+
     fun stats(
         period: Period,
         events: List<SmokeEvent>,
         purchases: List<Purchase>,
+        cigs: Map<Long, Cigarette>,
         now: Long = System.currentTimeMillis()
     ): PeriodStats {
         val from = startOf(period, now)
         val e = events.filter { it.timestamp >= from }
         val p = purchases.filter { it.timestamp >= from }
+        val vals = e.map { effective(it, cigs) }
         return PeriodStats(
             period = period,
             smokeCount = e.size,
-            smokeCost = e.sumOf { it.cost },
-            tarMg = e.sumOf { it.tarMg },
-            nicotineMg = e.sumOf { it.nicotineMg },
+            smokeCost = vals.sumOf { it.first },
+            tarMg = vals.sumOf { it.second },
+            nicotineMg = vals.sumOf { it.third },
             purchaseCount = p.sumOf { it.cigsCount },
             purchaseCost = p.sumOf { it.totalCost }
         )
@@ -83,6 +96,7 @@ object StatsCalculator {
     fun today(
         events: List<SmokeEvent>,
         purchases: List<Purchase>,
+        cigs: Map<Long, Cigarette>,
         now: Long = System.currentTimeMillis()
     ): TodayStats {
         val dayStart = startOf(Period.DAY, now)
@@ -102,18 +116,19 @@ object StatsCalculator {
         val boughtCigs = purchases.sumOf { it.cigsCount }
         val remaining = (boughtCigs - totalCount)
 
+        val todayVals = todayEvents.map { effective(it, cigs) }
         return TodayStats(
             count = todayEvents.size,
-            cost = todayEvents.sumOf { it.cost },
-            tarMg = todayEvents.sumOf { it.tarMg },
-            nicotineMg = todayEvents.sumOf { it.nicotineMg },
+            cost = todayVals.sumOf { it.first },
+            tarMg = todayVals.sumOf { it.second },
+            nicotineMg = todayVals.sumOf { it.third },
             lastSmokeAt = events.maxByOrNull { it.timestamp }?.timestamp,
             yesterdayCount = yesterdayCount,
             weeklyAverage = weeklyAverage,
             trackedDays = trackedDays,
             remainingCigs = remaining,
             totalSmokeCount = totalCount,
-            totalSmokeCost = events.sumOf { it.cost },
+            totalSmokeCost = events.sumOf { effective(it, cigs).first },
             totalPurchaseCost = purchases.sumOf { it.totalCost }
         )
     }

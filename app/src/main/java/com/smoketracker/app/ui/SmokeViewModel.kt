@@ -50,6 +50,26 @@ class SmokeViewModel(private val repo: SmokeRepository) : ViewModel() {
         )
     }
 
+    /** 编辑已有烟品（后补价格/焦油/尼古丁等）。 */
+    fun updateCigarette(
+        original: Cigarette,
+        name: String,
+        packPrice: Double,
+        cigsPerPack: Int,
+        tarMg: Double,
+        nicotineMg: Double
+    ) = viewModelScope.launch {
+        repo.updateCigarette(
+            original.copy(
+                name = name.trim(),
+                packPrice = packPrice,
+                cigsPerPack = cigsPerPack,
+                tarMg = tarMg,
+                nicotineMg = nicotineMg
+            )
+        )
+    }
+
     fun setDefault(cig: Cigarette) = viewModelScope.launch { repo.setDefaultCigarette(cig.id) }
 
     fun recordPurchase(cig: Cigarette, packs: Int, totalCost: Double) =

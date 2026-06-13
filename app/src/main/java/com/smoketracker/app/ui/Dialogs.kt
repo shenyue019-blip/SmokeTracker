@@ -54,31 +54,44 @@ fun CigaretteDropdown(
     }
 }
 
+/**
+ * 新增 / 编辑烟品。价格、焦油、尼古丁均可留空（首次可不填，之后再补）。
+ * 补填后统计会按当前数值回溯计算过去的记录。
+ * @param existing 传入则为编辑模式，预填原值。
+ */
 @Composable
 fun AddCigaretteDialog(
+    existing: Cigarette? = null,
     onDismiss: () -> Unit,
     onConfirm: (name: String, packPrice: Double, cigsPerPack: Int, tar: Double, nicotine: Double) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var price by remember { mutableStateOf("") }
-    var perPack by remember { mutableStateOf("20") }
-    var tar by remember { mutableStateOf("") }
-    var nicotine by remember { mutableStateOf("") }
+    fun num(v: Double) = if (v <= 0.0) "" else (if (v % 1.0 == 0.0) v.toInt().toString() else v.toString())
 
-    val valid = name.isNotBlank() &&
-        price.toDoubleOrNull() != null &&
-        (perPack.toIntOrNull() ?: 0) > 0
+    var name by remember { mutableStateOf(existing?.name ?: "") }
+    var price by remember { mutableStateOf(existing?.let { num(it.packPrice) } ?: "") }
+    var perPack by remember { mutableStateOf(existing?.cigsPerPack?.toString() ?: "20") }
+    var tar by remember { mutableStateOf(existing?.let { num(it.tarMg) } ?: "") }
+    var nicotine by remember { mutableStateOf(existing?.let { num(it.nicotineMg) } ?: "") }
+
+    // 只有烟名和每包支数是必填，其余可后补。
+    val valid = name.isNotBlank() && (perPack.toIntOrNull() ?: 0) > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("新增烟品") },
+        title = { Text(if (existing == null) "新增烟品" else "编辑烟品") },
         text = {
             Column {
                 NumberOrTextField("烟名", name, KeyboardType.Text) { name = it }
-                NumberOrTextField("每包价格（元）", price, KeyboardType.Decimal) { price = it }
+                NumberOrTextField("每包价格（元，可后补）", price, KeyboardType.Decimal) { price = it }
                 NumberOrTextField("每包支数", perPack, KeyboardType.Number) { perPack = it }
-                NumberOrTextField("单根焦油量（mg）", tar, KeyboardType.Decimal) { tar = it }
-                NumberOrTextField("单根尼古丁量（mg）", nicotine, KeyboardType.Decimal) { nicotine = it }
+                NumberOrTextField("单根焦油量（mg，可后补）", tar, KeyboardType.Decimal) { tar = it }
+                NumberOrTextField("单根尼古丁量（mg，可后补）", nicotine, KeyboardType.Decimal) { nicotine = it }
+                Text(
+                    "价格/焦油/尼古丁现在可以留空，之后补填后，之前的统计会自动算上。",
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
         },
         confirmButton = {

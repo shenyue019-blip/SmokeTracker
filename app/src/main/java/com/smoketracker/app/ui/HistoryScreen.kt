@@ -30,11 +30,13 @@ import com.smoketracker.app.data.StatsCalculator
 fun HistoryScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
     val events by vm.events.collectAsStateWithLifecycle()
     val purchases by vm.purchases.collectAsStateWithLifecycle()
+    val cigarettes by vm.cigarettes.collectAsStateWithLifecycle()
+    val cigMap = remember(cigarettes) { cigarettes.associateBy { it.id } }
 
     var periodIdx by remember { mutableIntStateOf(0) }
     val period = Period.entries[periodIdx]
-    val stats = remember(period, events, purchases) {
-        StatsCalculator.stats(period, events, purchases)
+    val stats = remember(period, events, purchases, cigMap) {
+        StatsCalculator.stats(period, events, purchases, cigMap)
     }
 
     Column(modifier.fillMaxWidth()) {
@@ -60,12 +62,12 @@ fun HistoryScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
         }
 
         // 明细：抽烟 + 买烟 混合，按时间倒序
-        val items = remember(period, events, purchases) {
-            val from = when (period) {
-                Period.ALL -> 0L
-                else -> 0L // 明细列出全部，汇总卡片已按周期统计
+        val items = remember(events, purchases, cigMap) {
+            val smokeItems = events.map {
+                // 花费按烟品当前价格算，后补价格后历史明细同步更新
+                val price = cigMap[it.cigaretteId]?.pricePerCig ?: it.cost
+                HistoryItem.Smoke(it.timestamp, it.cigaretteName, price)
             }
-            val smokeItems = events.map { HistoryItem.Smoke(it.timestamp, it.cigaretteName, it.cost) }
             val buyItems = purchases.map {
                 HistoryItem.Buy(it.timestamp, it.cigaretteName, it.packs, it.cigsCount, it.totalCost)
             }

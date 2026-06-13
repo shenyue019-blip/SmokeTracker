@@ -59,7 +59,10 @@ fun HomeScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
         }
     }
 
-    val today = remember(events, purchases, now) { StatsCalculator.today(events, purchases, now) }
+    val cigMap = remember(cigarettes) { cigarettes.associateBy { it.id } }
+    val today = remember(events, purchases, cigMap, now) {
+        StatsCalculator.today(events, purchases, cigMap, now)
+    }
     val trend = remember(events, now) { StatsCalculator.last7Days(events, now) }
 
     var showAdd by remember { mutableStateOf(false) }

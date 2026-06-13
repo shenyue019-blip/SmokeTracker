@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.smoketracker.app.data.Cigarette
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,7 @@ fun CigarettesScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
     val cigarettes by vm.cigarettes.collectAsStateWithLifecycle()
     val defaultCig by vm.defaultCigarette.collectAsStateWithLifecycle()
     var showAdd by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Cigarette?>(null) }
 
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -55,16 +57,25 @@ fun CigarettesScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
                             ) {
                                 Text(c.name, style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold)
-                                if (c.id == defaultCig?.id) {
-                                    AssistChip(onClick = {}, label = { Text("默认") })
-                                } else {
-                                    TextButton(onClick = { vm.setDefault(c) }) { Text("设为默认") }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (c.id == defaultCig?.id) {
+                                        AssistChip(onClick = {}, label = { Text("默认") })
+                                    } else {
+                                        TextButton(onClick = { vm.setDefault(c) }) { Text("设为默认") }
+                                    }
+                                    TextButton(onClick = { editing = c }) { Text("编辑") }
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            KeyValueRow("价格", "${money(c.packPrice)}/包 · ${money(c.pricePerCig)}/根")
+                            KeyValueRow(
+                                "价格",
+                                if (c.packPrice > 0) "${money(c.packPrice)}/包 · ${money(c.pricePerCig)}/根" else "待补充"
+                            )
                             KeyValueRow("每包支数", "${c.cigsPerPack} 支")
-                            KeyValueRow("单根焦油 / 尼古丁", "${avg(c.tarMg)} / ${avg(c.nicotineMg)} mg")
+                            KeyValueRow(
+                                "单根焦油 / 尼古丁",
+                                if (c.tarMg > 0 || c.nicotineMg > 0) "${avg(c.tarMg)} / ${avg(c.nicotineMg)} mg" else "待补充"
+                            )
                         }
                     }
                 }
@@ -78,6 +89,16 @@ fun CigarettesScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
             onConfirm = { name, price, perPack, tar, nic ->
                 vm.addCigarette(name, price, perPack, tar, nic)
                 showAdd = false
+            }
+        )
+    }
+    editing?.let { target ->
+        AddCigaretteDialog(
+            existing = target,
+            onDismiss = { editing = null },
+            onConfirm = { name, price, perPack, tar, nic ->
+                vm.updateCigarette(target, name, price, perPack, tar, nic)
+                editing = null
             }
         )
     }
