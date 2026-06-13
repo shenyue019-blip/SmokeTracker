@@ -28,6 +28,12 @@ class SmokeViewModel(private val repo: SmokeRepository) : ViewModel() {
 
     fun smokeOne(cig: Cigarette) = viewModelScope.launch { repo.smokeOne(cig) }
 
+    /** 散给别人一根。 */
+    fun giveAway(cig: Cigarette) = viewModelScope.launch { repo.giveAway(cig) }
+
+    /** 别人给自己一根。 */
+    fun receiveOne(cig: Cigarette) = viewModelScope.launch { repo.receiveOne(cig) }
+
     fun undoLast(onResult: (Boolean) -> Unit = {}) = viewModelScope.launch {
         onResult(repo.undoLastSmoke())
     }
@@ -78,18 +84,9 @@ class SmokeViewModel(private val repo: SmokeRepository) : ViewModel() {
     fun deleteEvent(e: SmokeEvent) = viewModelScope.launch { repo.deleteEvent(e) }
     fun deletePurchase(p: Purchase) = viewModelScope.launch { repo.deletePurchase(p) }
 
-    /** 编辑一条抽烟记录：可改烟品与时间，快照随新烟品刷新。 */
+    /** 编辑一条抽烟/散烟记录：改烟品与时间，按原类型重算快照。 */
     fun updateEvent(original: SmokeEvent, cig: Cigarette, timestamp: Long) = viewModelScope.launch {
-        repo.updateEvent(
-            original.copy(
-                cigaretteId = cig.id,
-                cigaretteName = cig.name,
-                timestamp = timestamp,
-                cost = cig.pricePerCig,
-                tarMg = cig.tarMg,
-                nicotineMg = cig.nicotineMg
-            )
-        )
+        repo.updateEvent(original, cig, timestamp)
     }
 
     /** 编辑一条买烟记录：可改烟品、包数、总价与时间。 */

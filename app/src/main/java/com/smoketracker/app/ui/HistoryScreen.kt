@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.smoketracker.app.data.Purchase
 import com.smoketracker.app.data.Period
 import com.smoketracker.app.data.SmokeEvent
+import com.smoketracker.app.data.SmokeKind
 import com.smoketracker.app.data.StatsCalculator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,10 +47,15 @@ fun HistoryScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
         StatsCalculator.stats(period, events, purchases, cigMap)
     }
 
-    // 抽烟记录 / 买烟记录 切换
-    var showSmoke by remember { mutableStateOf(true) }
+    // 三分类：0=抽烟 1=散烟 2=买烟
+    var tabSel by remember { mutableIntStateOf(0) }
     var editingSmoke by remember { mutableStateOf<SmokeEvent?>(null) }
     var editingPurchase by remember { mutableStateOf<Purchase?>(null) }
+
+    val smokeList = remember(events) { events.filter { it.kind == SmokeKind.SELF } }
+    val shareList = remember(events) {
+        events.filter { it.kind == SmokeKind.GIVE || it.kind == SmokeKind.RECEIVE }
+    }
 
     Column(modifier.fillMaxWidth()) {
         ScrollableTabRow(selectedTabIndex = periodIdx, edgePadding = 8.dp) {
@@ -71,23 +77,22 @@ fun HistoryScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
                 mg(stats.nicotineMg) to "尼古丁摄入",
                 money(stats.purchaseCost) to "买烟花费"
             )
+            Spacer(Modifier.height(12.dp))
+            TripleRow(
+                "${stats.giveCount}" to "散给别人(根)",
+                money(stats.giveCost) to "散烟花费",
+                "${stats.receiveCount}" to "别人给的(根)"
+            )
         }
 
-        // 两个独立列表的切换器
+        // 三个独立列表的切换器
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FilterChip(
-                selected = showSmoke,
-                onClick = { showSmoke = true },
-                label = { Text("抽烟记录 (${events.size})") }
-            )
-            FilterChip(
-                selected = !showSmoke,
-                onClick = { showSmoke = false },
-                label = { Text("买烟记录 (${purchases.size})") }
-            )
+            FilterChip(tabSel == 0, { tabSel = 0 }, { Text("抽烟 (${smokeList.size})") })
+            FilterChip(tabSel == 1, { tabSel = 1 }, { Text("散烟 (${shareList.size})") })
+            FilterChip(tabSel == 2, { tabSel = 2 }, { Text("买烟 (${purchases.size})") })
         }
         Text(
             "点任意一条可修改或删除",
@@ -96,16 +101,22 @@ fun HistoryScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        if (showSmoke) {
-            if (events.isEmpty()) EmptyHint("还没有抽烟记录")
+        when (tabSel) {
+            0 -> if (smokeList.isEmpty()) EmptyHint("还没有抽烟记录")
             else LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                items(events, key = { it.id }) { e ->
+                items(smokeList, key = { it.id }) { e ->
                     val price = cigMap[e.cigaretteId]?.pricePerCig ?: e.cost
                     SmokeRow(e, price) { editingSmoke = e }
                 }
             }
-        } else {
-            if (purchases.isEmpty()) EmptyHint("还没有买烟记录")
+            1 -> if (shareList.isEmpty()) EmptyHint("还没有散烟记录")
+            else LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                items(shareList, key = { it.id }) { e ->
+                    val price = cigMap[e.cigaretteId]?.pricePerCig ?: e.cost
+                    SmokeRow(e, price) { editingSmoke = e }
+                }
+            }
+            else -> if (purchases.isEmpty()) EmptyHint("还没有买烟记录")
             else LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 items(purchases, key = { it.id }) { p ->
                     PurchaseRow(p) { editingPurchase = p }
@@ -138,9 +149,14 @@ fun HistoryScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun SmokeRow(e: SmokeEvent, price: Double, onClick: () -> Unit) {
+    val (title, value) = when (e.kind) {
+        SmokeKind.GIVE -> "🎁 散给别人 · ${e.cigaretteName}" to money(price)
+        SmokeKind.RECEIVE -> "🤝 别人给的 · ${e.cigaretteName}" to "免费"
+        else -> "🚬 ${e.cigaretteName}" to money(price)
+    }
     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick)) {
         Column(Modifier.padding(12.dp)) {
-            KeyValueRow("🚬 ${e.cigaretteName}", money(price))
+            KeyValueRow(title, value)
             Text(
                 dateTimeOf(e.timestamp),
                 style = MaterialTheme.typography.bodySmall,

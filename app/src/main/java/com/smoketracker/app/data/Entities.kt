@@ -24,9 +24,16 @@ data class Cigarette(
         get() = if (cigsPerPack > 0) packPrice / cigsPerPack else 0.0
 }
 
+/** 抽烟事件的类型。 */
+object SmokeKind {
+    const val SELF = "SELF"        // 自己抽自己的烟
+    const val GIVE = "GIVE"        // 散烟：自己给别人（记花费，不记焦油/尼古丁，减库存）
+    const val RECEIVE = "RECEIVE"  // 散烟：别人给自己（不记花费，记焦油/尼古丁与根数，不减库存）
+}
+
 /**
- * 一次抽烟事件。关键字段做「快照」：即使以后改了烟价/焦油，
- * 历史统计依然按当时的数值计算，不会被回溯篡改。
+ * 一次抽烟/散烟事件。cost/tar/nicotine 为「快照」，仅在对应烟品被删除时作兜底；
+ * 烟品仍存在时统计按其当前数值动态计算。
  */
 @Entity(tableName = "smoke_events")
 data class SmokeEvent(
@@ -34,9 +41,10 @@ data class SmokeEvent(
     val cigaretteId: Long,
     val cigaretteName: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val cost: Double,           // 这根烟花了多少钱（快照）
-    val tarMg: Double,          // 摄入焦油 mg（快照）
-    val nicotineMg: Double      // 摄入尼古丁 mg（快照）
+    val cost: Double,           // 快照：这根烟花了多少钱
+    val tarMg: Double,          // 快照：摄入焦油 mg
+    val nicotineMg: Double,     // 快照：摄入尼古丁 mg
+    val kind: String = SmokeKind.SELF
 )
 
 /** 一次买烟记录。 */

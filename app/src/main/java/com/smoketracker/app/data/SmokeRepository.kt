@@ -27,22 +27,34 @@ class SmokeRepository(
 
     suspend fun setDefaultCigarette(id: Long) = cigaretteDao.setDefault(id)
 
-    /** 抽一根：按当前烟品数值生成快照事件。 */
-    suspend fun smokeOne(cig: Cigarette): Long {
-        return eventDao.insert(
-            SmokeEvent(
-                cigaretteId = cig.id,
-                cigaretteName = cig.name,
-                cost = cig.pricePerCig,
-                tarMg = cig.tarMg,
-                nicotineMg = cig.nicotineMg
-            )
+    /** 按类型构造一条事件的快照数值。 */
+    private fun eventOf(cig: Cigarette, kind: String): SmokeEvent = when (kind) {
+        SmokeKind.GIVE -> SmokeEvent(    // 散给别人：记花费，不记焦油/尼古丁
+            cigaretteId = cig.id, cigaretteName = cig.name,
+            cost = cig.pricePerCig, tarMg = 0.0, nicotineMg = 0.0, kind = kind
+        )
+        SmokeKind.RECEIVE -> SmokeEvent( // 别人给的：不记花费，记焦油/尼古丁
+            cigaretteId = cig.id, cigaretteName = cig.name,
+            cost = 0.0, tarMg = cig.tarMg, nicotineMg = cig.nicotineMg, kind = kind
+        )
+        else -> SmokeEvent(              // 自抽：全记
+            cigaretteId = cig.id, cigaretteName = cig.name,
+            cost = cig.pricePerCig, tarMg = cig.tarMg, nicotineMg = cig.nicotineMg, kind = SmokeKind.SELF
         )
     }
 
-    /** 撤销上一根（误触救星）。 */
+    /** 抽一根（自抽）。 */
+    suspend fun smokeOne(cig: Cigarette): Long = eventDao.insert(eventOf(cig, SmokeKind.SELF))
+
+    /** 散给别人一根。 */
+    suspend fun giveAway(cig: Cigarette): Long = eventDao.insert(eventOf(cig, SmokeKind.GIVE))
+
+    /** 别人给自己一根（抽了）。 */
+    suspend fun receiveOne(cig: Cigarette): Long = eventDao.insert(eventOf(cig, SmokeKind.RECEIVE))
+
+    /** 撤销上一根自抽（误触救星，只撤自抽，不影响散烟记录）。 */
     suspend fun undoLastSmoke(): Boolean {
-        val latest = eventDao.getLatest() ?: return false
+        val latest = eventDao.getLatestOfKind(SmokeKind.SELF) ?: return false
         eventDao.delete(latest)
         return true
     }
@@ -62,6 +74,11 @@ class SmokeRepository(
     suspend fun deletePurchase(p: Purchase) = purchaseDao.delete(p)
     suspend fun deleteEvent(e: SmokeEvent) = eventDao.delete(e)
 
-    suspend fun updateEvent(e: SmokeEvent) = eventDao.update(e)
+    /** 编辑一条事件：改烟品/时间，按其原本类型重算快照。 */
+    suspend fun updateEvent(original: SmokeEvent, cig: Cigarette, timestamp: Long) {
+        val rebuilt = eventOf(cig, original.kind).copy(id = original.id, timestamp = timestamp)
+        eventDao.update(rebuilt)
+    }
+
     suspend fun updatePurchase(p: Purchase) = purchaseDao.update(p)
 }

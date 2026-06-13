@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,18 +75,20 @@ fun HomeScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp)
     ) {
-        // 当前烟品切换
-        SectionCard("当前烟品（大按钮记这一种）") {
+        // 当前烟品：低调的紧凑选择器，右上角，只显示烟名
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
             if (cigarettes.isEmpty()) {
-                EmptyHint("还没有烟品，点下方「新增烟品」先添加一种。")
+                TextButton(onClick = { showAdd = true }) { Text("+ 先添加一种烟品") }
             } else {
-                Spacer(Modifier.height(8.dp))
-                CigaretteDropdown("默认烟品", cigarettes, defaultCig) { vm.setDefault(it) }
+                CompactCigaretteSelector(cigarettes, defaultCig) { vm.setDefault(it) }
             }
         }
 
         // 大按钮
-        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().padding(top = 8.dp, start = 24.dp, end = 24.dp, bottom = 16.dp), contentAlignment = Alignment.Center) {
             Button(
                 onClick = {
                     defaultCig?.let {
@@ -128,6 +131,32 @@ fun HomeScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
             }
         }
 
+        // 散烟小按钮（自己给别人 / 别人给自己）
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            TextButton(
+                onClick = {
+                    defaultCig?.let {
+                        vm.giveAway(it)
+                        Toast.makeText(context, "已记录：散给别人 1 根", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = defaultCig != null
+            ) { Text("🎁 散给别人") }
+            Spacer(Modifier.size(16.dp))
+            TextButton(
+                onClick = {
+                    defaultCig?.let {
+                        vm.receiveOne(it)
+                        Toast.makeText(context, "已记录：别人给的 1 根", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = defaultCig != null
+            ) { Text("🤝 别人给我") }
+        }
+
         // 今日卡片
         SectionCard("今日") {
             Spacer(Modifier.height(8.dp))
@@ -142,12 +171,26 @@ fun HomeScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
                 mg(today.nicotineMg) to "今日尼古丁",
                 "${today.remainingCigs}" to "剩余库存(根)"
             )
-            if (today.remainingCigs in 1..5) {
+            if (today.giveCount > 0) {
                 Spacer(Modifier.height(8.dp))
-                Text("⚠ 库存只剩 ${today.remainingCigs} 根，记得补货。", color = MaterialTheme.colorScheme.error)
-            } else if (today.remainingCigs <= 0 && purchases.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text("⚠ 按记录库存已抽完。", color = MaterialTheme.colorScheme.error)
+                KeyValueRow("今日散给别人", "${today.giveCount} 根 · ${money(today.giveCost)}")
+            }
+            when {
+                today.remainingCigs in 1..5 -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text("⚠ 库存只剩 ${today.remainingCigs} 根，记得补货。", color = MaterialTheme.colorScheme.error)
+                }
+                today.remainingCigs == 0 && purchases.isNotEmpty() -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text("⚠ 按记录库存已抽完。", color = MaterialTheme.colorScheme.error)
+                }
+                today.remainingCigs < 0 -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "⚠ 库存为负（差 ${-today.remainingCigs} 根），是不是买烟忘记记录了？可点「买烟」补记。",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
 

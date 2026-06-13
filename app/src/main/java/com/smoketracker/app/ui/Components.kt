@@ -6,10 +6,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -73,5 +83,37 @@ fun KeyValueRow(key: String, value: String) {
 fun EmptyHint(text: String) {
     Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+    }
+}
+
+/** 紧凑、低调的烟品选择器：只显示烟名 + 下拉。 */
+@Composable
+fun CompactCigaretteSelector(
+    cigarettes: List<com.smoketracker.app.data.Cigarette>,
+    selected: com.smoketracker.app.data.Cigarette?,
+    onSelect: (com.smoketracker.app.data.Cigarette) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Text(
+                "烟品：" + (selected?.name ?: "未选择"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                Icons.Filled.ArrowDropDown,
+                contentDescription = "切换烟品",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            cigarettes.forEach { c ->
+                DropdownMenuItem(
+                    text = { Text(c.name) },
+                    onClick = { onSelect(c); expanded = false }
+                )
+            }
+        }
     }
 }

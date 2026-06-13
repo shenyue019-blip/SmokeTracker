@@ -54,6 +54,9 @@ interface SmokeEventDao {
     @Query("SELECT * FROM smoke_events ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLatest(): SmokeEvent?
 
+    @Query("SELECT * FROM smoke_events WHERE kind = :kind ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatestOfKind(kind: String): SmokeEvent?
+
     @Query("SELECT COUNT(*) FROM smoke_events")
     fun observeTotalCount(): Flow<Int>
 
