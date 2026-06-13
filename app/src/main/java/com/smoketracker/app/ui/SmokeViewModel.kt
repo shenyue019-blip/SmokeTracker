@@ -78,6 +78,40 @@ class SmokeViewModel(private val repo: SmokeRepository) : ViewModel() {
     fun deleteEvent(e: SmokeEvent) = viewModelScope.launch { repo.deleteEvent(e) }
     fun deletePurchase(p: Purchase) = viewModelScope.launch { repo.deletePurchase(p) }
 
+    /** 编辑一条抽烟记录：可改烟品与时间，快照随新烟品刷新。 */
+    fun updateEvent(original: SmokeEvent, cig: Cigarette, timestamp: Long) = viewModelScope.launch {
+        repo.updateEvent(
+            original.copy(
+                cigaretteId = cig.id,
+                cigaretteName = cig.name,
+                timestamp = timestamp,
+                cost = cig.pricePerCig,
+                tarMg = cig.tarMg,
+                nicotineMg = cig.nicotineMg
+            )
+        )
+    }
+
+    /** 编辑一条买烟记录：可改烟品、包数、总价与时间。 */
+    fun updatePurchase(
+        original: Purchase,
+        cig: Cigarette,
+        packs: Int,
+        totalCost: Double,
+        timestamp: Long
+    ) = viewModelScope.launch {
+        repo.updatePurchase(
+            original.copy(
+                cigaretteId = cig.id,
+                cigaretteName = cig.name,
+                packs = packs,
+                cigsCount = packs * cig.cigsPerPack,
+                totalCost = totalCost,
+                timestamp = timestamp
+            )
+        )
+    }
+
     class Factory(private val repo: SmokeRepository) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {

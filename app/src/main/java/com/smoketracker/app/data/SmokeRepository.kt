@@ -61,4 +61,7 @@ class SmokeRepository(
 
     suspend fun deletePurchase(p: Purchase) = purchaseDao.delete(p)
     suspend fun deleteEvent(e: SmokeEvent) = eventDao.delete(e)
+
+    suspend fun updateEvent(e: SmokeEvent) = eventDao.update(e)
+    suspend fun updatePurchase(p: Purchase) = purchaseDao.update(p)
 }

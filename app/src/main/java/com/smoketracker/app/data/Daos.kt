@@ -60,6 +60,9 @@ interface SmokeEventDao {
     @Insert
     suspend fun insert(event: SmokeEvent): Long
 
+    @Update
+    suspend fun update(event: SmokeEvent)
+
     @Delete
     suspend fun delete(event: SmokeEvent)
 
@@ -74,6 +77,9 @@ interface PurchaseDao {
 
     @Insert
     suspend fun insert(purchase: Purchase): Long
+
+    @Update
+    suspend fun update(purchase: Purchase)
 
     @Delete
     suspend fun delete(purchase: Purchase)

@@ -1,6 +1,9 @@
 package com.smoketracker.app.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -9,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
@@ -16,13 +20,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.smoketracker.app.data.Purchase
 import com.smoketracker.app.data.Period
+import com.smoketracker.app.data.SmokeEvent
 import com.smoketracker.app.data.StatsCalculator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,6 +45,11 @@ fun HistoryScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
     val stats = remember(period, events, purchases, cigMap) {
         StatsCalculator.stats(period, events, purchases, cigMap)
     }
+
+    // 抽烟记录 / 买烟记录 切换
+    var showSmoke by remember { mutableStateOf(true) }
+    var editingSmoke by remember { mutableStateOf<SmokeEvent?>(null) }
+    var editingPurchase by remember { mutableStateOf<Purchase?>(null) }
 
     Column(modifier.fillMaxWidth()) {
         ScrollableTabRow(selectedTabIndex = periodIdx, edgePadding = 8.dp) {
@@ -61,66 +73,93 @@ fun HistoryScreen(vm: SmokeViewModel, modifier: Modifier = Modifier) {
             )
         }
 
-        // 明细：抽烟 + 买烟 混合，按时间倒序
-        val items = remember(events, purchases, cigMap) {
-            val smokeItems = events.map {
-                // 花费按烟品当前价格算，后补价格后历史明细同步更新
-                val price = cigMap[it.cigaretteId]?.pricePerCig ?: it.cost
-                HistoryItem.Smoke(it.timestamp, it.cigaretteName, price)
-            }
-            val buyItems = purchases.map {
-                HistoryItem.Buy(it.timestamp, it.cigaretteName, it.packs, it.cigsCount, it.totalCost)
-            }
-            (smokeItems + buyItems).sortedByDescending { it.timestamp }
+        // 两个独立列表的切换器
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = showSmoke,
+                onClick = { showSmoke = true },
+                label = { Text("抽烟记录 (${events.size})") }
+            )
+            FilterChip(
+                selected = !showSmoke,
+                onClick = { showSmoke = false },
+                label = { Text("买烟记录 (${purchases.size})") }
+            )
         }
-
         Text(
-            "全部明细（${items.size} 条）",
-            modifier = Modifier.padding(start = 24.dp, top = 8.dp, bottom = 4.dp),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+            "点任意一条可修改或删除",
+            modifier = Modifier.padding(start = 20.dp, bottom = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        if (items.isEmpty()) {
-            EmptyHint("还没有任何记录")
-        } else {
-            LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                items(items) { item -> HistoryRow(item) }
+
+        if (showSmoke) {
+            if (events.isEmpty()) EmptyHint("还没有抽烟记录")
+            else LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                items(events, key = { it.id }) { e ->
+                    val price = cigMap[e.cigaretteId]?.pricePerCig ?: e.cost
+                    SmokeRow(e, price) { editingSmoke = e }
+                }
             }
+        } else {
+            if (purchases.isEmpty()) EmptyHint("还没有买烟记录")
+            else LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                items(purchases, key = { it.id }) { p ->
+                    PurchaseRow(p) { editingPurchase = p }
+                }
+            }
+        }
+    }
+
+    editingSmoke?.let { target ->
+        EditSmokeDialog(
+            event = target,
+            cigarettes = cigarettes,
+            onDismiss = { editingSmoke = null },
+            onSave = { cig, ts -> vm.updateEvent(target, cig, ts); editingSmoke = null },
+            onDelete = { vm.deleteEvent(target); editingSmoke = null }
+        )
+    }
+    editingPurchase?.let { target ->
+        EditPurchaseDialog(
+            purchase = target,
+            cigarettes = cigarettes,
+            onDismiss = { editingPurchase = null },
+            onSave = { cig, packs, cost, ts ->
+                vm.updatePurchase(target, cig, packs, cost, ts); editingPurchase = null
+            },
+            onDelete = { vm.deletePurchase(target); editingPurchase = null }
+        )
+    }
+}
+
+@Composable
+private fun SmokeRow(e: SmokeEvent, price: Double, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick)) {
+        Column(Modifier.padding(12.dp)) {
+            KeyValueRow("🚬 ${e.cigaretteName}", money(price))
+            Text(
+                dateTimeOf(e.timestamp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
 
-private sealed interface HistoryItem {
-    val timestamp: Long
-    data class Smoke(override val timestamp: Long, val name: String, val cost: Double) : HistoryItem
-    data class Buy(
-        override val timestamp: Long,
-        val name: String,
-        val packs: Int,
-        val cigs: Int,
-        val cost: Double
-    ) : HistoryItem
-}
-
 @Composable
-private fun HistoryRow(item: HistoryItem) {
-    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+private fun PurchaseRow(p: Purchase, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick)) {
         Column(Modifier.padding(12.dp)) {
-            when (item) {
-                is HistoryItem.Smoke -> {
-                    KeyValueRow("🚬 抽烟 · ${item.name}", money(item.cost))
-                    Text(dateTimeOf(item.timestamp), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                is HistoryItem.Buy -> {
-                    KeyValueRow("🛒 买烟 · ${item.name}", money(item.cost))
-                    Text(
-                        "${item.packs} 包（${item.cigs} 根） · ${dateTimeOf(item.timestamp)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            KeyValueRow("🛒 ${p.cigaretteName}", money(p.totalCost))
+            Text(
+                "${p.packs} 包（${p.cigsCount} 根） · ${dateTimeOf(p.timestamp)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
