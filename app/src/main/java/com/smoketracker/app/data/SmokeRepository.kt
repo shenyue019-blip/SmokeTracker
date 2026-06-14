@@ -15,6 +15,12 @@ class SmokeRepository(
     val events: Flow<List<SmokeEvent>> = eventDao.observeAll()
     val purchases: Flow<List<Purchase>> = purchaseDao.observeAll()
 
+    /** 桌面小组件用：取一次默认烟品。 */
+    suspend fun defaultCigaretteOnce(): Cigarette? = cigaretteDao.getDefaultOnce()
+
+    /** 桌面小组件用：今日抽烟根数（自抽+散入）。 */
+    suspend fun smokeCountSince(start: Long): Int = eventDao.countSmokesSince(start)
+
     suspend fun addOrUpdateCigarette(c: Cigarette): Long {
         val isFirst = cigaretteDao.count() == 0
         val id = cigaretteDao.insert(c.copy(isDefault = c.isDefault || isFirst))

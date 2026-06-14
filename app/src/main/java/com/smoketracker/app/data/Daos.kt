@@ -20,6 +20,9 @@ interface CigaretteDao {
     @Query("SELECT * FROM cigarettes WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): Cigarette?
 
+    @Query("SELECT * FROM cigarettes WHERE isDefault = 1 LIMIT 1")
+    suspend fun getDefaultOnce(): Cigarette?
+
     @Query("SELECT COUNT(*) FROM cigarettes")
     suspend fun count(): Int
 
@@ -59,6 +62,9 @@ interface SmokeEventDao {
 
     @Query("SELECT COUNT(*) FROM smoke_events")
     fun observeTotalCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM smoke_events WHERE kind != 'GIVE' AND timestamp >= :start")
+    suspend fun countSmokesSince(start: Long): Int
 
     @Insert
     suspend fun insert(event: SmokeEvent): Long

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">烟记</string>
+    <string name="widget_label">烟记 · 抽一根</string>
+    <string name="widget_desc">点一下记录抽一根烟</string>
 </resources>
